@@ -112,7 +112,13 @@ class tx_Wsless_Hooks_RenderPreProcessorHook {
 
 		if (file_exists($lessFilename)) {
 			if (t3lib_div::isAllowedAbsPath($lessFilename)) {
+				$this->parser->setAllowUrlRewrite(true);
 				$cssContent = $this->parser->compileFile($lessFilename);
+
+				// fix the background images
+				$relativePath = $this->getRelativePath($cssFilename, $lessFilename);
+				$cssContent = str_replace(array("url('..","url(..","url(\".."), array("url('".$relativePath.'/..',"url(".$relativePath.'/..',"url(\"".$relativePath.'/..'), $cssContent);
+
 				t3lib_div::writeFile($cssFilename, $cssContent);
 			} else {
 				throw new Exception('Output filename ' . $cssFilename . ' is not allowed', 1299059883);
@@ -144,6 +150,42 @@ class tx_Wsless_Hooks_RenderPreProcessorHook {
 		}
 
 		return $hash;
+	}
+
+	/**
+	 * Calculating relative path between the less file and compiled css file
+	 *
+	 * @param string $from Existing less file absolute path
+	 * @param string $to To be written css file absolute path
+	 * @return string Relative path
+	 *
+	 */
+	private function getRelativePath($from, $to)
+	{
+			$from = explode('/', $from);
+			$to = explode('/', $to);
+			$relPath  = $to;
+
+			foreach($from as $depth => $dir) {
+					// find first non-matching dir
+					if($dir === $to[$depth]) {
+							// ignore this directory
+							array_shift($relPath);
+					} else {
+							// get number of remaining dirs to $from
+							$remaining = count($from) - $depth;
+							if($remaining > 1) {
+									// add traversals up to first matching dir
+									$padLength = (count($relPath) + $remaining - 1) * -1;
+									$relPath = array_pad($relPath, $padLength, '..');
+									break;
+							} else {
+									$relPath[0] = './' . $relPath[0];
+							}
+					}
+			}
+			unset($relPath[count($relPath)-1]);
+			return implode('/', $relPath);
 	}
 }
 ?>
